@@ -30,7 +30,8 @@ export default function request(
   const bufs: any[] = [];
   var sent = false;
   str._write = (chunk, encoding, callback) => {
-    bufs.push(chunk.toString(encoding === 'buffer' ? 'binary' : encoding));
+   // bufs.push(chunk.toString(encoding === 'buffer' ? 'binary' : encoding));
+    bufs.push(chunk.toString(encoding));
     callback();
   };
   str.on('finish', () => {
