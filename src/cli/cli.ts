@@ -8,7 +8,7 @@ import crypto from 'crypto';
 import openUrl from 'open';
 import { Command } from 'commander';
 import inquirer from 'inquirer';
-import request from 'request';
+import request from '../request';
 import base64url from 'base64url';
 import Repl from './repl';
 import jsforce, { Connection, OAuth2 } from '..';
@@ -253,10 +253,7 @@ export class Cli {
     const oauth2 = new OAuth2(oauth2Config);
     const verifier = base64url.encode(crypto.randomBytes(32));
     const challenge = base64url.encode(
-      crypto
-        .createHash('sha256')
-        .update(verifier)
-        .digest(),
+      crypto.createHash('sha256').update(verifier).digest(),
     );
     const state = base64url.encode(crypto.randomBytes(32));
     const authzUrl = oauth2.getAuthorizationUrl({
@@ -291,13 +288,9 @@ export class Cli {
   async downloadDefaultClientInfo(clientName: string): Promise<void> {
     const configUrl = 'https://jsforce.github.io/client-config/default.json';
     const res: { body: string } = await new Promise((resolve, reject) => {
-      request(configUrl, (err, res) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(res);
-        }
-      });
+      request({ method: 'GET', url: configUrl })
+        .on('complete', resolve)
+        .on('error', reject);
     });
     const clientConfig = JSON.parse(res.body);
     if (clientName === 'sandbox') {
@@ -308,9 +301,6 @@ export class Cli {
     return this.authorize(clientName);
   }
 
-  /**
-   *
-   */
   async waitCallback(
     serverUrl: string | undefined,
     state: string,

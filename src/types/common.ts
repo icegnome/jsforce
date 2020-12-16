@@ -21,7 +21,13 @@ export type HttpRequest = {
   url: string;
   method: HttpMethods;
   headers?: { [name: string]: string };
-  body?: string;
+  body?: string | null;
+};
+
+export type HttpRequestOptions = {
+  httpProxy?: string;
+  timeout?: number;
+  followRedirect?: boolean | ((redirectUrl: string) => HttpRequest | null);
 };
 
 export type HttpResponse = {
