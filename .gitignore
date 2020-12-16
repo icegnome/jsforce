@@ -10,7 +10,14 @@ pids
 logs
 results
 
+browser
+lib
+module
+
 node_modules
 npm-debug.log
 
 .npmignore
+.vscode
+.env
+.env*

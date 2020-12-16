@@ -130,6 +130,22 @@ export type QueryResult<R extends Record> = {
   nextRecordsUrl?: string;
 };
 
+export type QueryExplainResult = {
+  plans: Array<{
+    cardinality: number;
+    fields: string[];
+    leadingOperationType: 'Index' | 'Other' | 'Sharing' | 'TableScan';
+    notes: Array<{
+      description: string;
+      fields: string[];
+      tableEnumOrId: string;
+    }>;
+    relativeCost: number;
+    sobjectCardinality: number;
+    sobjectType: string;
+  }>;
+};
+
 const ResponseTargetValues = [
   'QueryResult',
   'Records',
@@ -768,7 +784,7 @@ export default class Query<
     const soql = await this.toSOQL();
     this._logger.debug(`SOQL = ${soql}`);
     const url = `/query/?explain=${encodeURIComponent(soql)}`;
-    return this._conn.request(url);
+    return this._conn.request<QueryExplainResult>(url);
   }
 
   /**
@@ -830,16 +846,13 @@ export default class Query<
       type = undefined;
     }
     options = options || {};
-    const type_: Optional<N> =
-      type || ((this._config && this._config.table) as Optional<N>);
+    const type_: Optional<N> = type || (this._config.table as Optional<N>);
     if (!type_) {
       throw new Error(
         'SOQL based query needs SObject type information to bulk delete.',
       );
     }
     // Set the threshold number to pass to bulk API
-    // FIXME:
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const thresholdNum =
       options.allowBulk === false
         ? -1
@@ -850,8 +863,14 @@ export default class Query<
         ? DEFAULT_BULK_THRESHOLD
         : this._conn._maxRequest / 2;
     return new Promise((resolve, reject) => {
-      const records: Record[] = [];
-      // let batch = null;
+      const createBatch = () =>
+        this._conn
+          .sobject(type_)
+          .deleteBulk()
+          .on('response', resolve)
+          .on('error', reject);
+      let records: Record[] = [];
+      let batch: ReturnType<typeof createBatch> | null = null;
       const handleRecord = (rec: Record) => {
         if (!rec.Id) {
           const err = new Error(
@@ -861,39 +880,30 @@ export default class Query<
           return;
         }
         const record: Record = { Id: rec.Id };
-        // TODO: enable batch switch
-        /*
         if (batch) {
           batch.write(record);
         } else {
-        */
-        records.push(record);
-        /*
-          if (thresholdNum < 0 || records.length > thresholdNum) {
+          records.push(record);
+          if (thresholdNum >= 0 && records.length > thresholdNum) {
             // Use bulk delete instead of SObject REST API
-            batch =
-              self._conn.sobject(type).deleteBulk()
-                .on('response', resolve)
-                .on('error', reject);
-            records.forEach(function(record) {
+            batch = createBatch();
+            for (const record of records) {
               batch.write(record);
-            });
+            }
             records = [];
           }
         }
-        */
       };
       const handleEnd = () => {
-        /*
         if (batch) {
           batch.end();
         } else {
-        */
-        const ids = records.map((record) => record.Id as string);
-        this._conn
-          .sobject(type_)
-          .destroy(ids, { allowRecursive: true })
-          .then(resolve, reject);
+          const ids = records.map((record) => record.Id as string);
+          this._conn
+            .sobject(type_)
+            .destroy(ids, { allowRecursive: true })
+            .then(resolve, reject);
+        }
       };
       this.stream('record')
         .on('data', handleRecord)
@@ -946,8 +956,6 @@ export default class Query<
         ? RecordStream.map(mapping)
         : RecordStream.recordMapStream(mapping);
     // Set the threshold number to pass to bulk API
-    // FIXME:
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const thresholdNum =
       options.allowBulk === false
         ? -1
@@ -958,44 +966,38 @@ export default class Query<
         ? DEFAULT_BULK_THRESHOLD
         : this._conn._maxRequest / 2;
     return new Promise((resolve, reject) => {
-      const records: SObjectUpdateRecord<S, N>[] = [];
-      // let batch = null;
+      const createBatch = () =>
+        this._conn
+          .sobject(type_)
+          .updateBulk()
+          .on('response', resolve)
+          .on('error', reject);
+      let records: SObjectUpdateRecord<S, N>[] = [];
+      let batch: ReturnType<typeof createBatch> | null = null;
       const handleRecord = (record: Record) => {
-        // TODO: enable batch switch
-        /*
         if (batch) {
           batch.write(record);
         } else {
-        */
-        records.push(record as SObjectUpdateRecord<S, N>);
-        /*
-        if (thresholdNum < 0 || records.length > thresholdNum) {
+          records.push(record as SObjectUpdateRecord<S, N>);
+        }
+        if (thresholdNum >= 0 && records.length > thresholdNum) {
           // Use bulk update instead of SObject REST API
-          batch =
-            self._conn.sobject(type).updateBulk()
-              .on('response', resolve)
-              .on('error', reject);
-          records.forEach(function(record) {
+          batch = createBatch();
+          for (const record of records) {
             batch.write(record);
-          });
+          }
           records = [];
         }
-      }
-        */
       };
       const handleEnd = () => {
-        /*
         if (batch) {
           batch.end();
         } else {
-        */
-        this._conn
-          .sobject(type_)
-          .update(records, { allowRecursive: true })
-          .then(resolve, reject);
-        /*
+          this._conn
+            .sobject(type_)
+            .update(records, { allowRecursive: true })
+            .then(resolve, reject);
         }
-        */
       };
       this.stream('record')
         .on('error', reject)
