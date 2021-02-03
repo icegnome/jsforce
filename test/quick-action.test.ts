@@ -2,9 +2,10 @@ import assert from 'assert';
 import ConnectionManager from './helper/connection-manager';
 import config from './config';
 import { isObject, isString } from './util';
+import type { QuickAction } from 'jsforce';
 
 const connMgr = new ConnectionManager(config);
-const conn: any = connMgr.createConnection(); // TODO: remove any
+const conn = connMgr.createConnection();
 
 /**
  *
@@ -16,7 +17,7 @@ beforeAll(async () => {
 /**
  *
  */
-test('list global actions and return global actions', async () => {
+it('should list global actions and return global actions', async () => {
   const results = await conn.quickActions();
   assert.ok(Array.isArray(results));
   for (const result of results) {
@@ -30,7 +31,7 @@ test('list global actions and return global actions', async () => {
 /**
  *
  */
-test('list sobject actions and return global actions', async () => {
+it('should list sobject actions and return global actions', async () => {
   const results = await conn.sobject('Account').quickActions();
   assert.ok(Array.isArray(results));
   for (const result of results) {
@@ -41,12 +42,12 @@ test('list sobject actions and return global actions', async () => {
   }
 });
 
-let action: any; // TODO: remove any
+let action: QuickAction<any>;
 
 /**
  *
  */
-test('describe global action info and return global actions', async () => {
+it('should describe global action info and return global actions', async () => {
   action = conn.quickAction('LogACall');
   const res = await action.describe();
   assert.ok(isObject(res));
@@ -61,7 +62,7 @@ test('describe global action info and return global actions', async () => {
 /**
  *
  */
-test('get default values of the action and return default field values', async () => {
+it('should get default values of the action and return default field values', async () => {
   const res = await action.defaultValues();
   assert.ok(isObject(res));
   // assert.ok(res.Subject === null);
@@ -73,10 +74,11 @@ test('get default values of the action and return default field values', async (
 /**
  *
  */
-test('get default values of the action for an account record and return default values', async () => {
+it('should get default values of the action for an account record and return default values', async () => {
   const ret = await conn
     .sobject('Account')
     .create({ Name: 'JSforce QuickAction Test' });
+  assert.ok(ret.success);
   const accId = ret.id;
   try {
     const res = await action.defaultValues(accId);
@@ -93,10 +95,11 @@ test('get default values of the action for an account record and return default 
 /**
  *
  */
-test('execute action for record', async () => {
+it('should execute action for record', async () => {
   const ret = await conn
     .sobject('Account')
     .create({ Name: 'JSforce QuickAction Test' });
+  assert.ok(ret.success);
   const accId = ret.id;
   const record = {
     Subject: 'My Task Test',
