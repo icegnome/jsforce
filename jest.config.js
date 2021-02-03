@@ -1,7 +1,9 @@
 module.exports = {
-  testMatch: [
-    '**/test/{connection-*,query,sobject,analytics,apex,bulk,chatter,metadata,soap,streaming}.test.ts',
-  ],
+  testMatch: ['**/test/*.test.ts'],
   verbose: true,
   setupFilesAfterEnv: ['./jest.setup.js'],
+  moduleNameMapper: {
+    '^jsforce$': '<rootDir>',
+    '^jsforce/(.+)': '<rootDir>/$1',
+  },
 };

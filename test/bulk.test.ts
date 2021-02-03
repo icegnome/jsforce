@@ -1,12 +1,11 @@
 import assert from 'assert';
-import fs from 'fs';
 import path from 'path';
-import { Connection, Date as SfDate } from '../src';
+import fs from './helper/fs';
+import { Connection, Date as SfDate, Record } from 'jsforce';
 import ConnectionManager from './helper/connection-manager';
 import config from './config';
 import { isObject, isString } from './util';
 import { isNodeJS } from './helper/env';
-import { Record } from '../src/types';
 
 const connMgr = new ConnectionManager(config);
 const conn = connMgr.createConnection();
@@ -22,7 +21,7 @@ beforeAll(async () => {
 /**
  *
  */
-test('bulk insert records and return result status', async () => {
+it('should bulk insert records and return result status', async () => {
   const records = [
     ...Array.from(Array(200), (a, i) => ({
       Name: `Bulk Account #${i + 1}`,
@@ -47,7 +46,7 @@ test('bulk insert records and return result status', async () => {
 /**
  *
  */
-test('bulk update and return updated status', async () => {
+it('should bulk update and return updated status', async () => {
   let records = await conn
     .sobject('Account')
     .find({ Name: { $like: 'Bulk Account%' } }, ['Id', 'Name'])
@@ -64,7 +63,7 @@ test('bulk update and return updated status', async () => {
 /**
  *
  */
-test('bulk update with empty input and raise client input error', async () => {
+it('should bulk update with empty input and raise client input error', async () => {
   try {
     await conn.bulk.load('Account', 'update', []);
     assert.fail();
@@ -77,7 +76,7 @@ test('bulk update with empty input and raise client input error', async () => {
 /**
  *
  */
-test('bulk delete and return deleted status', async () => {
+it('should bulk delete and return deleted status', async () => {
   const records = await conn
     .sobject('Account')
     .find({ Name: { $like: 'Bulk Account%' } })
@@ -93,7 +92,7 @@ test('bulk delete and return deleted status', async () => {
 /**
  *
  */
-test('bulk delete with empty input and raise client input error', async () => {
+it('should bulk delete with empty input and raise client input error', async () => {
   try {
     await conn.bulk.load('Account', 'delete', []);
   } catch (err) {
@@ -107,7 +106,7 @@ if (isNodeJS()) {
   /**
    *
    */
-  test('bulk insert from file and return inserted results', async () => {
+  it('should bulk insert from file and return inserted results', async () => {
     const fstream = fs.createReadStream(
       path.join(__dirname, 'data/Account.csv'),
     );
@@ -127,7 +126,7 @@ if (isNodeJS()) {
   /**
    *
    */
-  test('bulk delete from file and return deleted results', async () => {
+  it('should bulk delete from file and return deleted results', async () => {
     const records = await conn
       .sobject('Account')
       .find({ Name: { $like: 'Bulk Account%' } });
@@ -160,7 +159,7 @@ if (isNodeJS()) {
   /**
    *
    */
-  test('bulk query and get records with yielding file output', async () => {
+  it('should bulk query and get records with yielding file output', async () => {
     const file = path.join(__dirname, '/data/BulkQuery_export.csv');
     const fstream = fs.createWriteStream(file);
     const count = await conn.sobject(config.bigTable).count({});
@@ -191,7 +190,7 @@ if (isNodeJS()) {
 /**
  *
  */
-test('call bulk api from invalid session conn with refresh fn, and return result', async () => {
+it('should call bulk api from invalid session conn with refresh fn, and return result', async () => {
   const accounts = Array.from(Array(100), (a, i) => ({
     Name: `Session Expiry Test #${i}`,
   }));
@@ -220,7 +219,7 @@ test('call bulk api from invalid session conn with refresh fn, and return result
 /**
  *
  */
-test('call bulk api from invalid session conn without refresh fn, and raise error', async () => {
+it('should call bulk api from invalid session conn without refresh fn, and raise error', async () => {
   const conn3 = new Connection({
     instanceUrl: conn.instanceUrl,
     accessToken: 'invalid_token',
@@ -244,7 +243,7 @@ const bulkAccountNum = 250;
 /**
  *
  */
-test('bulk update using Query#update and return updated status', async () => {
+it('should bulk update using Query#update and return updated status', async () => {
   const accounts = Array.from(Array(bulkAccountNum), (a, i) => ({
     Name: `New Bulk Account #${i + 1}`,
     BillingState: 'CA',
@@ -280,7 +279,7 @@ test('bulk update using Query#update and return updated status', async () => {
 /**
  *
  */
-test('bulk update using Query#update with unmatching query and return empty array records', async () => {
+it('should bulk update using Query#update with unmatching query and return empty array records', async () => {
   const rets = await conn
     .sobject('Account')
     .find({ CreatedDate: { $lt: new SfDate('1970-01-01T00:00:00Z') } }) // should not match any records
@@ -295,7 +294,7 @@ test('bulk update using Query#update with unmatching query and return empty arra
 /**
  *
  */
-test('bulk delete using Query#destroy and return deleted status', async () => {
+it('should bulk delete using Query#destroy and return deleted status', async () => {
   const rets = await conn
     .sobject('Account')
     .find({ Name: { $like: 'New Bulk Account%' } })
@@ -311,7 +310,7 @@ test('bulk delete using Query#destroy and return deleted status', async () => {
 /**
  *
  */
-test('bulk delete using Query#destroy with unmatching query and return empty array records', async () => {
+it('should bulk delete using Query#destroy with unmatching query and return empty array records', async () => {
   const rets = await conn
     .sobject('Account')
     .find({ CreatedDate: { $lt: new SfDate('1970-01-01T00:00:00Z') } })
@@ -327,7 +326,7 @@ const smallAccountNum = 20;
 /**
  *
  */
-test('bulk update using Query#update with bulkThreshold modified and return updated status', async () => {
+it('should bulk update using Query#update with bulkThreshold modified and return updated status', async () => {
   const records = Array.from({ length: smallAccountNum }).map((_, i) => ({
     Name: `New Bulk Account #${i + 1}`,
     BillingState: 'CA',
@@ -366,7 +365,7 @@ test('bulk update using Query#update with bulkThreshold modified and return upda
 /**
  *
  */
-test('bulk delete using Query#destroy with bulkThreshold modified and return deleted status', async () => {
+it('should bulk delete using Query#destroy with bulkThreshold modified and return deleted status', async () => {
   const rets = await conn
     .sobject('Account')
     .find({ Name: { $like: 'New Bulk Account%' } })

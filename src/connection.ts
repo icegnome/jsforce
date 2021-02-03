@@ -9,6 +9,7 @@ import {
   Callback,
   Record,
   SaveResult,
+  UpsertResult,
   DescribeGlobalResult,
   DescribeSObjectResult,
   DescribeTab,
@@ -16,6 +17,7 @@ import {
   DescribeQuickActionResult,
   UpdatedResult,
   DeletedResult,
+  SearchResult,
   OrganizationLimitsInfo,
   Optional,
   SignedRequestObject,
@@ -27,6 +29,8 @@ import {
   SObjectInputRecord,
   SObjectUpdateRecord,
   SObjectFieldNames,
+  UserInfo,
+  LimitInfo,
 } from './types';
 import { StreamPromise } from './util/promise';
 import Transport, {
@@ -47,6 +51,7 @@ import Query from './query';
 import { QueryOptions } from './query';
 import SObject from './sobject';
 import QuickAction from './quick-action';
+import Process from './process';
 import { formatDate } from './util/formatter';
 import Analytics from './api/analytics';
 import Apex from './api/apex';
@@ -55,11 +60,12 @@ import Chatter from './api/chatter';
 import Metadata from './api/metadata';
 import SoapApi from './api/soap';
 import Streaming from './api/streaming';
+import Tooling from './api/tooling';
 
 /**
  * type definitions
  */
-export type ConnectionConfig<S extends Schema> = {
+export type ConnectionConfig<S extends Schema = Schema> = {
   version?: string;
   loginUrl?: string;
   accessToken?: string;
@@ -75,19 +81,6 @@ export type ConnectionConfig<S extends Schema> = {
   logLevel?: LogLevelConfig;
   callOptions?: { [name: string]: string };
   refreshFn?: SessionRefreshFunc<S>;
-};
-
-export type UserInfo = {
-  id: string;
-  organizationId: string;
-  url: string;
-};
-
-export type LimitInfo = {
-  apiUsage?: {
-    used: number;
-    limit: number;
-  };
 };
 
 export type ConnectionEstablishOptions = {
@@ -112,7 +105,7 @@ const defaultConnectionConfig: {
 } = {
   loginUrl: 'https://login.salesforce.com',
   instanceUrl: '',
-  version: '43.0',
+  version: '50.0',
   logLevel: 'NONE',
   maxRequest: 10,
 };
@@ -205,9 +198,8 @@ function createUsernamePasswordRefreshFn<S extends Schema>(
 /**
  * @private
  */
-function toSaveResult(id: Optional<string>, err: SaveError): SaveResult {
+function toSaveResult(err: SaveError): SaveResult {
   return {
-    ...(id ? { id } : {}),
     success: false,
     errors: [err],
   };
@@ -295,6 +287,10 @@ export default class Connection<
     return raiseNoModuleError('streaming');
   }
 
+  get tooling(): Tooling<S> {
+    return raiseNoModuleError('tooling');
+  }
+
   /**
    *
    */
@@ -313,11 +309,15 @@ export default class Connection<
     this.loginUrl = loginUrl || defaultConnectionConfig.loginUrl;
     this.instanceUrl = instanceUrl || defaultConnectionConfig.instanceUrl;
     this.version = version || defaultConnectionConfig.version;
-    this.oauth2 = oauth2
-      ? oauth2 instanceof OAuth2
+    this.oauth2 =
+      oauth2 instanceof OAuth2
         ? oauth2
-        : new OAuth2(oauth2)
-      : new OAuth2({ loginUrl: this.loginUrl });
+        : new OAuth2({
+            loginUrl: this.loginUrl,
+            proxyUrl,
+            httpProxy,
+            ...oauth2,
+          });
     let refreshFn = config.refreshFn;
     if (!refreshFn && this.oauth2.clientId) {
       refreshFn = oauthRefreshFn;
@@ -781,6 +781,18 @@ export default class Connection<
   }
 
   /**
+   * Execute search by SOSL
+   *
+   * @param {String} sosl - SOSL string
+   * @param {Callback.<Array.<RecordResult>>} [callback] - Callback function
+   * @returns {Promise.<Array.<RecordResult>>}
+   */
+  search(sosl: string) {
+    var url = this._baseUrl() + '/search?q=' + encodeURIComponent(sosl);
+    return this.request<SearchResult>(url);
+  }
+
+  /**
    *
    */
   queryMore(locator: string, options?: QueryOptions) {
@@ -966,7 +978,7 @@ export default class Connection<
           if (options.allOrNone || !err.errorCode) {
             throw err;
           }
-          return toSaveResult(null, err);
+          return toSaveResult(err);
         }),
       ),
     );
@@ -1108,7 +1120,7 @@ export default class Connection<
           if (options.allOrNone || !err.errorCode) {
             throw err;
           }
-          return toSaveResult(record.Id, err);
+          return toSaveResult(err);
         }),
       ),
     );
@@ -1175,7 +1187,7 @@ export default class Connection<
     records: InputRecord[],
     extIdField: FieldNames,
     options?: DmlOptions,
-  ): Promise<SaveResult[]>;
+  ): Promise<UpsertResult[]>;
   upsert<
     N extends SObjectNames<S>,
     InputRecord extends SObjectInputRecord<S, N> = SObjectInputRecord<S, N>,
@@ -1185,7 +1197,7 @@ export default class Connection<
     record: InputRecord,
     extIdField: FieldNames,
     options?: DmlOptions,
-  ): Promise<SaveResult>;
+  ): Promise<UpsertResult>;
   upsert<
     N extends SObjectNames<S>,
     InputRecord extends SObjectInputRecord<S, N> = SObjectInputRecord<S, N>,
@@ -1195,7 +1207,7 @@ export default class Connection<
     records: InputRecord | InputRecord[],
     extIdField: FieldNames,
     options?: DmlOptions,
-  ): Promise<SaveResult | SaveResult[]>;
+  ): Promise<UpsertResult | UpsertResult[]>;
   /**
    *
    * @param type
@@ -1240,7 +1252,7 @@ export default class Connection<
           if (!isArray || options.allOrNone || !err.errorCode) {
             throw err;
           }
-          return toSaveResult(null, err);
+          return toSaveResult(err);
         });
       }),
     );
@@ -1316,7 +1328,7 @@ export default class Connection<
           if (options.allOrNone || !err.errorCode) {
             throw err;
           }
-          return toSaveResult(id, err);
+          return toSaveResult(err);
         }),
       ),
     );
@@ -1532,4 +1544,9 @@ export default class Connection<
   quickAction(actionName: string): QuickAction<S> {
     return new QuickAction(this, `/quickActions/${actionName}`);
   }
+
+  /**
+   * Module which manages process rules and approval processes
+   */
+  process = new Process(this);
 }
